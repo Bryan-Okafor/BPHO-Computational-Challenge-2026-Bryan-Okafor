@@ -678,7 +678,7 @@ def boxPage():
 
     with left:
         boxWidth = st.slider('Box width / Angstrom', 0.1, 5.0, 0.53, 0.01)
-        maxLevel = st.slider('Highest level shown', 1, 8, 3)
+        maxLevel = st.slider('Highest starting level n', 1, 8, 3)
         showAll = st.checkbox('Overlay all levels', value=True)
         showWave = st.checkbox('Show the wavefunction as well', value=False)
 
