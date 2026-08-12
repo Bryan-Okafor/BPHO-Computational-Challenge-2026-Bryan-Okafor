@@ -1109,7 +1109,172 @@ def spectrumPage():
 
 
 # ----------------------------------------------------------------------
+# ----------------------------------------------------------------------
+
+# ----------------------------------------------------------------------
+# Task 1: Random walk
+# ----------------------------------------------------------------------
+def randomWalkPage():
+    st.header('Random Walk')
+
+    left, right = st.columns([1, 2.4])
+
+    with left:
+        steps = st.slider('Steps per walk N', 100, 5000, 1000, step=100)
+        stepSize = st.slider('Step size s', 0.5, 5.0, 1.0, 0.5)
+        walkCount = st.slider('Number of walks', 1, 200, 50, step=1)
+        seed = st.number_input('Random seed', 0, 9999, 0)
+
+        showTheory = st.checkbox('Show the expected spread', value=True)
+
+        st.metric('Expected distance  s√N',
+                  f'{stepSize * np.sqrt(steps):.1f}')
+
+        st.caption('Each step is the same length but points in a completely '
+                   'random direction, so the steps largely cancel. What is '
+                   'left over grows as the square root of N rather than in '
+                   'proportion to it.')
+
+    @st.cache_data(show_spinner=False)
+    def buildWalks(steps, stepSize, walkCount, seed):
+        rng = np.random.default_rng(seed)
+        paths, finals = [], []
+
+        for _ in range(walkCount):
+            # Every angle for the whole walk is drawn in one call, and numpy
+            # resolves them into components together, so no step by step loop
+            # is needed to build the trajectory
+            angles = rng.uniform(0, 2*np.pi, steps)
+
+            # A cumulative sum turns the individual displacements into
+            # positions, and a zero is prepended so the path starts at
+            # the origin rather than at the end of the first step
+            x = np.concatenate([[0], np.cumsum(stepSize * np.cos(angles))])
+            y = np.concatenate([[0], np.cumsum(stepSize * np.sin(angles))])
+
+            paths.append((x, y))
+            finals.append(np.hypot(x[-1], y[-1]))
+
+        return paths, np.array(finals)
+
+    paths, finals = buildWalks(steps, stepSize, walkCount, seed)
+
+    with left:
+        st.metric('Mean distance reached', f'{finals.mean():.1f}')
+        if walkCount > 4:
+            st.metric('Mean as a fraction of s√N',
+                      f'{finals.mean() / (stepSize*np.sqrt(steps)):.3f}')
+
+    with right:
+        # This plot uses a light background, since the overlaid walks are
+        # drawn in many different colours and they separate far better
+        # against white than against the dark theme used elsewhere
+        fig, ax = plt.subplots(figsize=(7.5, 7))
+        fig.patch.set_facecolor('white')
+        ax.set_facecolor('white')
+
+        for x, y in paths:
+            ax.plot(x, y, linewidth=0.6, alpha=0.65)
+
+        if showTheory and walkCount > 1:
+            expected = stepSize * np.sqrt(steps)
+            ax.add_patch(plt.Circle((0, 0), expected, fill=False,
+                                    color='black', linestyle='--',
+                                    linewidth=1.2, alpha=0.7))
+            ax.annotate(f's√N = {expected:.0f}',
+                        xy=(expected*0.71, expected*0.71),
+                        fontsize=9, color='black')
+
+        ax.plot(0, 0, 'o', color='black', markersize=6, zorder=5)
+
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_title(f'{walkCount} walks of {steps} steps, step size {stepSize}')
+        ax.set_aspect('equal')
+        ax.grid(alpha=0.15)
+        st.pyplot(fig)
+        plt.close(fig)
+
+    st.divider()
+    st.subheader('Checking the square root law')
+
+    controls, plotArea = st.columns([1, 2.4])
+
+    with controls:
+        trials = st.slider('Walks averaged at each N', 50, 500, 200, step=50)
+        st.caption('A single walk tells you nothing, since its endpoint is '
+                   'itself random. Averaging many walks at each N is what '
+                   'makes the trend visible.')
+
+    @st.cache_data(show_spinner='Averaging over many walks...')
+    def scalingTest(stepSize, trials, seed):
+        rng = np.random.default_rng(seed + 1)
+        sizes = [10, 30, 100, 300, 1000, 3000, 10000]
+        means, rms = [], []
+
+        for N in sizes:
+            angles = rng.uniform(0, 2*np.pi, (trials, N))
+            endX = np.sum(stepSize * np.cos(angles), axis=1)
+            endY = np.sum(stepSize * np.sin(angles), axis=1)
+            distances = np.hypot(endX, endY)
+            means.append(distances.mean())
+            rms.append(np.sqrt((distances**2).mean()))
+
+        return np.array(sizes), np.array(means), np.array(rms)
+
+    sizes, means, rms = scalingTest(stepSize, trials, seed)
+    theory = stepSize * np.sqrt(sizes)
+
+    with plotArea:
+        graph, ratios = st.columns([1.2, 1])
+
+        with graph:
+            fig, ax = darkFigure(6, 4.4)
+            ax.plot(sizes, theory, 's--', color='#888888',
+                    linewidth=1.4, markersize=5, label='s√N')
+            ax.plot(sizes, rms, '^-', color='#39ff14',
+                    linewidth=1.4, markersize=5, label='simulated RMS')
+            ax.plot(sizes, means, 'o-', color='#00e5ff',
+                    linewidth=1.4, markersize=5, label='simulated mean')
+            ax.set_xscale('log')
+            ax.set_yscale('log')
+            ax.set_xlabel('N')
+            ax.set_ylabel('Distance from origin')
+            ax.set_title('A power law becomes a straight line on log axes',
+                         fontsize=9)
+            ax.legend(facecolor='#0e1117', labelcolor='white', fontsize=8)
+            st.pyplot(fig)
+            plt.close(fig)
+
+        with ratios:
+            fig, ax = darkFigure(5, 4.4)
+            ax.plot(sizes, rms/theory, '^-', color='#39ff14',
+                    linewidth=1.4, markersize=5, label='RMS / s√N')
+            ax.plot(sizes, means/theory, 'o-', color='#00e5ff',
+                    linewidth=1.4, markersize=5, label='mean / s√N')
+            ax.axhline(1.0, color='#888888', linestyle='--', linewidth=1)
+            ax.axhline(np.sqrt(np.pi)/2, color='#ff6b35',
+                       linestyle=':', linewidth=1.2)
+            ax.annotate('√π/2 = 0.886', xy=(sizes[1], np.sqrt(np.pi)/2 + 0.012),
+                        color='#ff6b35', fontsize=8)
+            ax.set_xscale('log')
+            ax.set_xlabel('N')
+            ax.set_ylabel('Ratio to s√N')
+            ax.set_ylim(0.8, 1.1)
+            ax.legend(facecolor='#0e1117', labelcolor='white', fontsize=8)
+            ax.set_title('Where the offset comes from', fontsize=9)
+            st.pyplot(fig)
+            plt.close(fig)
+
+    gradient = np.polyfit(np.log(sizes), np.log(rms), 1)[0]
+    st.caption(f'Fitting the simulated RMS on log axes gives a gradient of '
+               f'{gradient:.4f}, against the half a power law predicts. The '
+               f'RMS lands on s√N while the mean sits about eleven percent '
+               f'below it, and that gap is not an error: s√N is the root mean '
+               f'square displacement, and for a two dimensional Gaussian the '
+               f'mean is √π/2 of the RMS.')
 pages = {
+    'Random walk': randomWalkPage,
     'Brownian motion': brownianPage,
     'Black body radiation': planckPage,
     'Photoelectric effect': photoelectricPage,
