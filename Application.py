@@ -1012,7 +1012,7 @@ def spectrumPage():
         A = st.slider('Mass number A', 1, 14, 1)
         chosen = st.multiselect('Series', list(seriesInfo),
                                 default=list(seriesInfo))
-        nMax = st.slider('Highest level followed', 6, 60, 40)
+        nMax = st.slider('Highest starting level n', 6, 60, 40)
 
         st.metric('Ionisation energy', f'{-orbitalEnergy(Z, A, 1):.3f} eV')
 
