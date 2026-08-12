@@ -1209,7 +1209,7 @@ pages = {
     'Hydrogenic orbitals': orbitalPage,
 }
 
-st.sidebar.title('BPhO Challenge 2026')
+st.sidebar.title('BPhO Challenge 2026: Bryan Okafor')
 st.sidebar.caption('Quantum Mechanics')
 choice = st.sidebar.radio('Simulation', list(pages))
 st.sidebar.divider()
